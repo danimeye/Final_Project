@@ -22,6 +22,7 @@
 import json
 import requests
 import unittest
+import sqlite3
 from bs4 import BeautifulSoup
 # Begin filling in instructions....
 
@@ -42,26 +43,27 @@ except:
 # Save and return your results in a variable called html_park_list, which should represent a list of html strings with info from each park. 
 
 def get_natlparks_data():
-	base_url = "https://www.nps.gov/state/" + code + "/index.htm"
+
 	unique_identifier = "natl_parks_data"
-	params_dict = {}
 	state_codes = ['al','ak','as','az','ca','co','ct','de','dc','fl','ga','gu','hi','id','il','in','ia','ks','ky','la','me',
 	'md','ma','mi','mn','ms','mo','mt','ne','nv','nh','nj','nm','ny','nc','nd','mp','oh','ok','or','pa','pr','ri','sc','sd','tn','tx','ut','vt','vi','va','wa','wv','wi','wy']
 	html_park_list = []
-
 	if unique_identifier in CACHE_DICTION:
 		print("using cached data")
 		html_park_list = CACHE_DICTION[unique_identifier]
 	else:
 		print("accessing park data from internet")
 		for code in state_codes:
+			base_url = "https://www.nps.gov/state/" + code + "/index.htm"
 			html_text = requests.get(base_url)
+			#print(html_text.text)
 			html_park_list.append(html_text.text)
-			print(html_text.url)
-		CACHE_DICTION[unique_identifier] = html_list # adding the new data to the cache dictionary
+			# print(html_text.url)
+		CACHE_DICTION[unique_identifier] = html_park_list # adding the new data to the cache dictionary
 		cache_file = open(CACHE_FNAME, 'w')
 		cache_file.write(json.dumps(CACHE_DICTION))
 		cache_file.close()
+		#print(html_park_list[0])
 	return html_park_list
 		
 
@@ -72,41 +74,48 @@ def get_article_links():
 
 	base_url = "https://www.nps.gov/index.htm"
 	req_text = requests.get(base_url).text
-	soup = BeautifulSoup(req_text, html.parser)
+	soup = BeautifulSoup(req_text, "html.parser")
 	articles = soup.find(class_ = "Component FeatureGrid")
 	article_links = []
-	for article_html in articles:
-		article_links.append(soup.find(a).text)
+	for link in articles.find_all('a'):
+		article_links.append(link.get('href'))
 	return article_links 
 
 # Write a function called get_article_data that receives a list of article links as input. For each of these links, fetch html data and add it to your cache file. 
 # Save and return the html data of the articles in a variable called html_article_list, which represent a list of html strings with info from each article.
 
 def get_article_data(article_links):
-	base_url = "https://www.nps.gov" + link
 	unique_identifier = "article_data"
-	params_dict = {}
 	html_article_list = []
-
 	if unique_identifier in CACHE_DICTION:
 		print("using cached data")
 		html_article_list = CACHE_DICTION[unique_identifier]
 	else:
 		print("accessing article data from internet")
 		for link in article_links:
+			base_url = "https://www.nps.gov" + link
 			html_text = requests.get(base_url)
 			html_article_list.append(html_text.text)
 			print(html_text.url)
-		CACHE_DICTION[unique_identifier] = html_list # adding the new data to the cache dictionary
+		CACHE_DICTION[unique_identifier] = html_article_list # adding the new data to the cache dictionary
 		cache_file = open(CACHE_FNAME, 'w')
 		cache_file.write(json.dumps(CACHE_DICTION))
 		cache_file.close()
 	return html_article_list
 
-'''
+
 # Invoke the get_natlparks_data function and save it a variable called html_park_data. Using this html data, create a list of NationalPark objects and save them in a variable called park_objs.
 
 html_park_data = get_natlparks_data()
+#print(html_park_data[0])
+
+article_link_data = get_article_links()
+#print(article_link_data)
+
+html_article_data = get_article_data(article_link_data)
+
+print(html_article_data[0])
+'''
 for state_html in html_park_data:
 	soup = BeautifulSoup(state_html, html.parser)
 	st_parks = soup.find(id = "parkListResult")
@@ -126,19 +135,23 @@ class NationalPark(html_string): # set up location, description, tel_number, sit
 		self.site_category = soup.find(h2).text
 
 		#city 
+'''
 
 # CREATING DATABASES
 
-conn = sqlite3.connect("naitonal_parks.db")
+conn = sqlite3.connect("national_parks.db")
 cur = conn.cursor()
 
-statement = 'DROP TABLE IF EXISTS Tweets'
+statement = 'DROP TABLE IF EXISTS Parks'
 cur.execute(statement)
-statement = 'DROP TABLE IF EXISTS Users'
+statement = 'DROP TABLE IF EXISTS States'
 cur.execute(statement)
-'''
+statement = 'DROP TABLE IF EXISTS Articles'
+cur.execute(statement)
 
-
+table_spec = 'CREATE TABLE IF NOT EXISTS '
+table_spec += 'Parks (name TEXT PRIMARY KEY, state TEXT, description TEXT, site_category TEXT)'
+cur.execute(table_spec)
 
 
 
