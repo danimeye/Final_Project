@@ -26,7 +26,46 @@ import sqlite3
 from bs4 import BeautifulSoup
 # Begin filling in instructions....
 
+class NationalPark(object): # set up location, description, tel_number, site category
 
+	def __init__(self, html_string, current_state):
+		
+		park_info = html_string.find(class_= "col-md-9 col-sm-9 col-xs-12 table-cell list_left")
+
+		self.name = park_info.find('a').text
+
+		self.description = park_info.find('p').text
+
+		self.site_category = park_info.find('h2').text
+
+		self.state = current_state
+
+	def get_useful_info(self, html_string):
+		pass 
+
+# class Article(object):
+
+# 	def __init__(self, html_string):
+
+# 		article_info = html_string
+
+# 		self.title = 
+
+# 		self.description = 
+
+# 		self.article_url = 
+
+		
+'''
+	def __str__(self):
+		if self.city == "":
+			return "{0} is a {1}. Here is a description of the {0}: {2}".format(self.name, self.site_category, self.description)
+		else:
+			return "{0} is a {1} located in {2}. Here is a description of the {0}: {3}".format(self.name, self.site_category, self.city, self.description)
+
+	def other_info():
+		pass 
+'''
 # Create a file to cache the information you retrieve from the internet. Save this in a file called 206finalproj_caching.json. 
 
 CACHE_FNAME = "206finalproj_caching.json"
@@ -84,7 +123,7 @@ def get_article_links():
 # Write a function called get_article_data that receives a list of article links as input. For each of these links, fetch html data and add it to your cache file. 
 # Save and return the html data of the articles in a variable called html_article_list, which represent a list of html strings with info from each article.
 
-def get_article_data(article_links):
+def get_article_html(article_links):
 	unique_identifier = "article_data"
 	html_article_list = []
 	if unique_identifier in CACHE_DICTION:
@@ -101,41 +140,43 @@ def get_article_data(article_links):
 		cache_file = open(CACHE_FNAME, 'w')
 		cache_file.write(json.dumps(CACHE_DICTION))
 		cache_file.close()
-	return html_article_list
+	return html_article_list 
 
 
 # Invoke the get_natlparks_data function and save it a variable called html_park_data. Using this html data, create a list of NationalPark objects and save them in a variable called park_objs.
 
 html_park_data = get_natlparks_data()
 #print(html_park_data[0])
+print(type(html_park_data[0]))
 
 article_link_data = get_article_links()
 #print(article_link_data)
 
-html_article_data = get_article_data(article_link_data)
+html_article_data = get_article_html(article_link_data)
+#print(html_article_data[0])
 
-print(html_article_data[0])
-'''
+park_objs = []
+repeat_parks = []
 for state_html in html_park_data:
-	soup = BeautifulSoup(state_html, html.parser)
-	st_parks = soup.find(id = "parkListResult")
-	park_objs = []
+	soup = BeautifulSoup(state_html, "html.parser")
+	current_state = soup.find(class_ = "ContentHeader").text
+	#print(current_state)
+	st_parks = soup.find(class_ = "col-md-9 col-sm-12 col-xs-12 stateCol")
+#print(type(st_parks))
+	#print(st_parks)
+#print(type(st_parks.find_all(class_ = "clearfix")[0]))
 	for item in st_parks.find_all(class_= "clearfix"):
-		park_objs.append(NationalPark(item))
+		current_obj = NationalPark(item, current_state)
+		if current_obj not in repeat_parks:
+			repeat_parks.append(current_obj)
+			park_objs.append(current_obj)
 
-class NationalPark(html_string): # set up location, description, tel_number, site category
 
-	def __init__(self, html_string):
-		soup = BeautifulSoup(html_string, html.parser)
+#sorted_park_objs = [park for park in park_objs]
+sorted_park_objs = sorted(park_objs, key = lambda x: x.name)
+for park in sorted_park_objs:
+	print(park.name, park.state)
 
-		self.name = soup.find(a).text
-
-		self.description = soup.find(p)
-
-		self.site_category = soup.find(h2).text
-
-		#city 
-'''
 
 # CREATING DATABASES
 
@@ -150,10 +191,15 @@ statement = 'DROP TABLE IF EXISTS Articles'
 cur.execute(statement)
 
 table_spec = 'CREATE TABLE IF NOT EXISTS '
-table_spec += 'Parks (name TEXT PRIMARY KEY, state TEXT, description TEXT, site_category TEXT)'
+table_spec += 'Parks (id INTEGER PRIMARY KEY, name TEXT, site_category TEXT, description TEXT, state TEXT)'
 cur.execute(table_spec)
 
+for park in sorted_park_objs:
+	s1 = 'INSERT OR IGNORE INTO Parks Values(?, ?, ?, ?, ?)'
+	park_vals = (None, park.name, park.site_category, park.description, park.state)
+	cur.execute(s1, park_vals)
 
+conn.commit()
 
 
 
