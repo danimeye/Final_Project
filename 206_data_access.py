@@ -43,17 +43,33 @@ class NationalPark(object): # set up location, description, tel_number, site cat
 	def get_useful_info(self, html_string):
 		pass 
 
-# class Article(object):
+class Article(object):
 
-# 	def __init__(self, html_string):
+	def __init__(self, html_string):
 
-# 		article_info = html_string
+		self.title = html_string.find('a').text
 
-# 		self.title = 
+		self.description = html_string.find('p').text
 
-# 		self.description = 
+		self.article_url = html_string.find('a').get('href')
 
-# 		self.article_url = 
+		# article_info = html_string.find(class_ = "FeatureGrid-item col-xs-12")
+		# try: 
+		# 	smaller_info = html_string.find(class_ = "FeatureGrid-item col-xs-12 col-sm-6")
+
+		# 	self.title = smaller_info.find('h3').text
+
+		# 	self.description = smaller_info.find('p').text
+
+		# 	self.article_url = smaller_info.find('a').get('href')
+		# except:
+		# 	smaller_info = html_string.find(class_ = "FeatureGrid-item col-xs-12 col-sm-4")
+
+		# 	self.title = smaller_info.find('h3').text
+
+		# 	self.description = smaller_info.find('p').text
+
+		# 	self.article_url = smaller_info.find('a').get('href')
 
 		
 '''
@@ -124,7 +140,7 @@ def get_article_links():
 # Save and return the html data of the articles in a variable called html_article_list, which represent a list of html strings with info from each article.
 
 def get_article_html(article_links):
-	unique_identifier = "article_data"
+	unique_identifier = "article_html"
 	html_article_list = []
 	if unique_identifier in CACHE_DICTION:
 		print("using cached data")
@@ -142,18 +158,36 @@ def get_article_html(article_links):
 		cache_file.close()
 	return html_article_list 
 
+def get_article_data():
+	unique_identifier = "article_data"
+	if unique_identifier in CACHE_DICTION:
+		print("using cached data")
+		req_text = CACHE_DICTION[unique_identifier]
+	else:
+		print("accessing article data from internet")
+		base_url = "https://www.nps.gov/index.htm"
+		req_text = requests.get(base_url).text
+		print(type(req_text))
+		CACHE_DICTION[unique_identifier] = req_text
+		cache_file = open(CACHE_FNAME, 'w')
+		cache_file.write(json.dumps(CACHE_DICTION))
+		cache_file.close()
+	return req_text
 
 # Invoke the get_natlparks_data function and save it a variable called html_park_data. Using this html data, create a list of NationalPark objects and save them in a variable called park_objs.
 
 html_park_data = get_natlparks_data()
 #print(html_park_data[0])
-print(type(html_park_data[0]))
+#print(type(html_park_data[0]))
 
 article_link_data = get_article_links()
 #print(article_link_data)
 
-html_article_data = get_article_html(article_link_data)
+html_article_pages = get_article_html(article_link_data)
 #print(html_article_data[0])
+
+html_article_data = get_article_data()
+#print(html_article_data)
 
 park_objs = []
 repeat_parks = []
@@ -162,21 +196,37 @@ for state_html in html_park_data:
 	current_state = soup.find(class_ = "ContentHeader").text
 	#print(current_state)
 	st_parks = soup.find(class_ = "col-md-9 col-sm-12 col-xs-12 stateCol")
-#print(type(st_parks))
-	#print(st_parks)
-#print(type(st_parks.find_all(class_ = "clearfix")[0]))
 	for item in st_parks.find_all(class_= "clearfix"):
 		current_obj = NationalPark(item, current_state)
 		if current_obj not in repeat_parks:
 			repeat_parks.append(current_obj)
 			park_objs.append(current_obj)
 
-
-#sorted_park_objs = [park for park in park_objs]
+sorted_park_objs = [park for park in park_objs]
 sorted_park_objs = sorted(park_objs, key = lambda x: x.name)
 for park in sorted_park_objs:
-	print(park.name, park.state)
+	#print(park.name, park.state)
+	pass
 
+article_objs = []
+soup = BeautifulSoup(html_article_data, "html.parser")
+all_articles = soup.find(class_ = "Component FeatureGrid")
+#print(type(all_articles))
+#print(all_articles)
+
+article_list1 = [Article(article) for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-6")]
+# for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-6"):
+# 	# article_objs.append(Article(article))
+
+article_list2 = [Article(article) for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-4")]
+
+article_objs = article_list1 + article_list2
+
+# for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-4"):
+# 	article_objs.append(Article(article))
+
+for article in article_objs:
+	print(article.description)
 
 # CREATING DATABASES
 
