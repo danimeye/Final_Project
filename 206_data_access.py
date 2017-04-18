@@ -23,11 +23,16 @@ import json
 import requests
 import unittest
 import sqlite3
+from re import sub
+from decimal import Decimal
 from bs4 import BeautifulSoup
 # Begin filling in instructions....
 
-class NationalPark(object): # set up location, description, tel_number, site category
+# Define a class called NationalPark that accepts an HTML formatted string and the state name of the park as input. Use BeautifulSoup to parse through the html data 
+# in order to correctly assign values to instance variables. Instance variables for this class should include the park's name, description, category, and state. The class should
+# also include a method that will define how the park will be represented when printed to the user. It should make use of each of the instance variables.
 
+class NationalPark(object): # set up location, description, tel_number, site category
 	def __init__(self, html_string, current_state):
 		
 		park_info = html_string.find(class_= "col-md-9 col-sm-9 col-xs-12 table-cell list_left")
@@ -40,48 +45,50 @@ class NationalPark(object): # set up location, description, tel_number, site cat
 
 		self.state = current_state
 
+	def __str__(self):
+		return "{0} is a {1} located in {2}. Here is a description of the {0}: {3}".format(self.name, self.site_category, self.state, self.description)
+
 	def get_useful_info(self, html_string):
 		pass 
 
-class Article(object):
+# Define a class called Article that accepts an HTML formatted string (representing one article on the National Parks' home page) as input. Use BeautifulSoup to parse through the html data
+# in order to correctly assign values to instance variables. Instance variables for this class should include the article' title, description, and the url to search it.
 
+class Article(object):
 	def __init__(self, html_string):
 
-		self.title = html_string.find('a').text
+		self.title = html_string.find(class_ = "Feature-title carrot-end").text
 
 		self.description = html_string.find('p').text
 
 		self.article_url = html_string.find('a').get('href')
 
-		# article_info = html_string.find(class_ = "FeatureGrid-item col-xs-12")
-		# try: 
-		# 	smaller_info = html_string.find(class_ = "FeatureGrid-item col-xs-12 col-sm-6")
+class State(object):
+	def __init__(self, html_string, current_state):
+	
+		state_info = html_string.find_all("li")
+		#print(type(state_info))
 
-		# 	self.title = smaller_info.find('h3').text
-
-		# 	self.description = smaller_info.find('p').text
-
-		# 	self.article_url = smaller_info.find('a').get('href')
-		# except:
-		# 	smaller_info = html_string.find(class_ = "FeatureGrid-item col-xs-12 col-sm-4")
-
-		# 	self.title = smaller_info.find('h3').text
-
-		# 	self.description = smaller_info.find('p').text
-
-		# 	self.article_url = smaller_info.find('a').get('href')
-
-		
-'''
-	def __str__(self):
-		if self.city == "":
-			return "{0} is a {1}. Here is a description of the {0}: {2}".format(self.name, self.site_category, self.description)
+		if " Visitors to National Parks" in state_info[1].text:
+			self.visitors = state_info[1].find('strong').text
 		else:
-			return "{0} is a {1} located in {2}. Here is a description of the {0}: {3}".format(self.name, self.site_category, self.city, self.description)
+			self.visitors = 0
+		#print(type(self.visitors))
 
-	def other_info():
-		pass 
-'''
+		if " Economic Benefit from National Park Tourism »" in state_info[2].text:
+			self.econ_benefit = state_info[2].find('strong').text
+		else:
+			self.econ_benefit = 0
+		#self. econ_benefit = int(text_benefit)
+		#self.econ_benefit = Decimal(sub(r'[^\d]', '', text_benefit))
+
+		if " of Rehabilitation Projects Stimulated by Tax Incentives (since 1995) »" in state_info[3].text:
+			self.tax_projects = state_info[3].find('strong').text
+		else:
+			self.tax_projects = 0
+		
+		self.name = current_state	
+
 # Create a file to cache the information you retrieve from the internet. Save this in a file called 206finalproj_caching.json. 
 
 CACHE_FNAME = "206finalproj_caching.json"
@@ -94,7 +101,7 @@ except:
     CACHE_DICTION = {}
 
 
-# Write a function called get_natl_parks_data that retrieves html data for the nation parks/monuments from each state on the National Parks website. Add this html data into your cache file. 
+# Write a function called get_natl_parks_data that retrieves html data for the nation parks/monuments from each state on the National Parks website. Add this html data to your cache file. 
 # Save and return your results in a variable called html_park_list, which should represent a list of html strings with info from each park. 
 
 def get_natlparks_data():
@@ -136,7 +143,7 @@ def get_article_links():
 		article_links.append(link.get('href'))
 	return article_links 
 
-# Write a function called get_article_data that receives a list of article links as input. For each of these links, fetch html data and add it to your cache file. 
+# Write a function called get_article_html that receives a list of article links as input. For each of these links, fetch html data and add it to your cache file. 
 # Save and return the html data of the articles in a variable called html_article_list, which represent a list of html strings with info from each article.
 
 def get_article_html(article_links):
@@ -158,37 +165,38 @@ def get_article_html(article_links):
 		cache_file.close()
 	return html_article_list 
 
+# Write a function called get_article_data that retrieves html data of the articles on the National Parks homepage. Add this html data to your cache file. 
+# Save and return the html data of the articles in a variable called html_articles, which represents the html data of the National Parks homepage. 
 def get_article_data():
 	unique_identifier = "article_data"
 	if unique_identifier in CACHE_DICTION:
 		print("using cached data")
-		req_text = CACHE_DICTION[unique_identifier]
+		html_articles = CACHE_DICTION[unique_identifier]
 	else:
 		print("accessing article data from internet")
 		base_url = "https://www.nps.gov/index.htm"
-		req_text = requests.get(base_url).text
-		print(type(req_text))
-		CACHE_DICTION[unique_identifier] = req_text
+		html_articles = requests.get(base_url).text
+		print(type(html_articles))
+		CACHE_DICTION[unique_identifier] = html_articles
 		cache_file = open(CACHE_FNAME, 'w')
 		cache_file.write(json.dumps(CACHE_DICTION))
 		cache_file.close()
-	return req_text
+	return html_articles
 
-# Invoke the get_natlparks_data function and save it a variable called html_park_data. Using this html data, create a list of NationalPark objects and save them in a variable called park_objs.
 
+# Invoke the get_natlparks_data function and save it to a variable called html_park_data.
 html_park_data = get_natlparks_data()
-#print(html_park_data[0])
-#print(type(html_park_data[0]))
 
+# Invoke the get_article_links function and save it to a variable called article_link_data. 
 article_link_data = get_article_links()
-#print(article_link_data)
 
+# Using article_link_data, invoke the get_aticle_html function and save it to a variable called html_article_pages. 
 html_article_pages = get_article_html(article_link_data)
-#print(html_article_data[0])
 
+# Invoke the get_article_data function and save it to a variable called html_article_data. 
 html_article_data = get_article_data()
-#print(html_article_data)
 
+# Using the information stored in html_park_data, create a list of NationalPark objects and save them in a variable called park_objs.
 park_objs = []
 repeat_parks = []
 for state_html in html_park_data:
@@ -202,42 +210,65 @@ for state_html in html_park_data:
 			repeat_parks.append(current_obj)
 			park_objs.append(current_obj)
 
+# Sort the list of park objects alphabetically by name and save the new list in a variable called sorted_park_objs. 
 sorted_park_objs = [park for park in park_objs]
 sorted_park_objs = sorted(park_objs, key = lambda x: x.name)
-for park in sorted_park_objs:
-	#print(park.name, park.state)
-	pass
+#print(sorted_park_objs[-1])
 
+state_objs = []
+for state_html in html_park_data:
+	soup = BeautifulSoup(state_html, "html.parser")
+	current_state = soup.find(class_ = "ContentHeader").text
+	state_info = soup.find(class_ = "col-md-3 col-sm-12 col-xs-12 stateCol stateCol-right")
+	state_objs.append(State(state_info, current_state))
+
+# for st in state_objs:
+# 	print(st.econ_benefit)
+#print(type(state_info))
+# Using the information stored in html_article_data, create a list of Article objects and save them in a variable called article_objs. 
 article_objs = []
 soup = BeautifulSoup(html_article_data, "html.parser")
 all_articles = soup.find(class_ = "Component FeatureGrid")
-#print(type(all_articles))
-#print(all_articles)
-
 article_list1 = [Article(article) for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-6")]
-# for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-6"):
-# 	# article_objs.append(Article(article))
-
 article_list2 = [Article(article) for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-4")]
 
 article_objs = article_list1 + article_list2
 
-# for article in all_articles.find_all(class_ = "FeatureGrid-item col-xs-12 col-sm-4"):
-# 	article_objs.append(Article(article))
 
-for article in article_objs:
-	print(article.description)
+# Create a database file called national_parks.db. In the database, you will make three tables called Parks, Articles, and States as follows:
 
-# CREATING DATABASES
+# table Parks, with columns:
+# - id (representing the default id settings- this column should be the PRIMARY KEY)
+# - name (containing the string that represents the national park's name)
+# - site_category (containing the string that represents the type of national park)
+# - description (containing the description of the park)
+# - state (containing the name of the state the park is located in)
+
+# table Articles, with columns:
+# - id (representing the default id settings- this column should be the PRIMARY KEY)
+# - title (containing the string that represents th title of the article)
+# - description (containing the description of the park)
+# - article_url (containing the string that represents that article's url)
+
+# table States, with columns:
+# - id (representing the default id settings- this column should be the PRIMARY KEY)
+# - name (containing the string that represents the name of the state)
+# - visitors (containing the integer representing the number of visitors to the national park)
+# - econ_benefit (containing the amount of money representing the economic benefit from national park tourism)
+# - tax_projects (containing the amount of money representing the tax incentives used to stimulate projects)
+
+# You should load all of the above information into their respective tables
 
 conn = sqlite3.connect("national_parks.db")
 cur = conn.cursor()
 
 statement = 'DROP TABLE IF EXISTS Parks'
 cur.execute(statement)
-statement = 'DROP TABLE IF EXISTS States'
-cur.execute(statement)
+
 statement = 'DROP TABLE IF EXISTS Articles'
+cur.execute(statement)
+
+statement = 'DROP TABLE IF EXISTS States'
 cur.execute(statement)
 
 table_spec = 'CREATE TABLE IF NOT EXISTS '
@@ -249,15 +280,29 @@ for park in sorted_park_objs:
 	park_vals = (None, park.name, park.site_category, park.description, park.state)
 	cur.execute(s1, park_vals)
 
+table_spec = 'CREATE TABLE IF NOT EXISTS '
+table_spec += 'Articles (id INTEGER PRIMARY KEY, title TEXT, description TEXT, url TEXT)'
+cur.execute(table_spec)
+
+for article in article_objs:
+	s2 = 'INSERT OR IGNORE INTO Articles Values(?, ?, ?, ?)'
+	article_vals = (None, article.title, article.description, article.article_url)
+	cur.execute(s2, article_vals)
+
+table_spec = 'CREATE TABLE IF NOT EXISTS '
+table_spec += 'States (id INTEGER PRIMARY KEY, name TEXT, visitors INTEGER, econ_benefit MONEY, tax_projects MONEY)'
+cur.execute(table_spec)
+
+for st in state_objs:
+	s3 = 'INSERT OR IGNORE INTO States Values(?, ?, ?, ?, ?)'
+	st_vals = (None, st.name, st.visitors, st.econ_benefit, st.tax_projects)
+	cur.execute(s3, st_vals)
+
 conn.commit()
 
 
 
 
-
-
-
-# WRITE METHOD TO GET TUPLE THAT RETURNS DATA YOU WANT IN YOUR DATA BASE- WILL CALL ON EACH PARK TO LOAD INTO TABLES
 		
 
 
@@ -272,32 +317,30 @@ conn.commit()
 # Remember to invoke your tests so they will run! (Recommend using the verbosity=2 argument.)
 
 ###################### TEST CASES #########################
-'''
+
 class TestPlan(unittest.TestCase):
 	def test_get_data(self):
-		self.assertEqual(type(html_list), type([]), 'Testing that the return value of the get_park_data() function is a list')
-	def test_description1(self):
-		park1 = NationalPark()
-		self.assertEqual(type(park1.description), type(""), 'Testing that the description of the park is a string')
+		html_park_data = get_natlpark_data()
+		self.assertEqual(type(html_park_data), type([]), 'Testing that the return value of the get_natlpark_data() function is a list')
+	def test_park_name(self):
+		self.assertEqual(type(sorted_park_objs[0].name), type(""), 'Testing that the name of the park is a string')
 	def test_articleText(self):
-		article1 = Article()
-		self.assertEqual(type(article1.title), type(""), 'Testing that the title of the article is a string')
+		self.assertEqual(type(article_objs[0].title), type(""), 'Testing that the title of the article is a string')
 	def test_description_list():
-		self.assertEqual(type(test_description_list), type([]), 'Testing that the list of national park descriptions, description_list, is a list')
+		self.assertEqual(type(sorted_park_objs), type([]), 'Testing that the sorted_park_objs is a list')
 	def test_park_list(self):
-		park1 = NationalPark()
-		self.assertEqual(type(park_list[0]), type(park1), 'Testing that the first element in the list of park instances, park_list, is a NationalPark object')
+		self.assertEqual(sorted_park_objs[0].name, "Zion", 'Testing that the last park in sorted_park_objs is Zion')
 	def test_article_list(self):
 		article1 = Article()
 		self.assertEqual(type(article_list[0]), type(article1), 'Testing that the first element in the list of article instances, article_list, is an Article object')
-	def test_mentioned_parks(self):
-		self.assertEqual(type(mentioned_parks) type({'state':'park'})
+	# def test_mentioned_parks(self):
+	# 	self.assertEqual(type(mentioned_parks) type({'state':'park'})
 	def test_DB(self):
-		conn = sqlite3.connect('natlparks.db')
+		conn = sqlite3.connect('national_parks.db')
 		cur = conn.cursor()
-		cur.execute('SELECT name FROM Parks INNER JOIN States WHERE States.name = 'Florida'')
+		cur.execute('SELECT name FROM Parks')
 		result = cur.fetchall()
-		self.assertEqual(len(result), 12, 'Testing that the number of national parks in Florida in the database is 12')
+		self.assertEqual(len(result), 644, 'Testing that the number of national parks in the database is 644')
 		conn.close()
 	
 
@@ -307,4 +350,3 @@ class TestPlan(unittest.TestCase):
 ## Remember to invoke all your tests...
 if __name__ == "__main__":
 	unittest.main(verbosity=2)
-'''
