@@ -23,14 +23,14 @@ import json
 import requests
 import unittest
 import sqlite3
-from re import sub
-from decimal import Decimal
+import collections
 from bs4 import BeautifulSoup
 # Begin filling in instructions....
 
 # Define a class called NationalPark that accepts an HTML formatted string and the state name of the park as input. Use BeautifulSoup to parse through the html data 
 # in order to correctly assign values to instance variables. Instance variables for this class should include the park's name, description, category, and state. The class should
-# also include a method that will define how the park will be represented when printed to the user. It should make use of each of the instance variables.
+# also include two methods: 1) one that will define how the park will be represented when printed to the user, making use of each of the instance variables and 2) another that 
+# will return a list of useful url's to search for more information on the park such as basic info, alerts and conditions, etc. 
 
 class NationalPark(object): # set up location, description, tel_number, site category
 
@@ -49,7 +49,6 @@ class NationalPark(object): # set up location, description, tel_number, site cat
 		return "{0} is a {1} located in {2}. Here is a description of the {0}: {3}".format(self.name, self.site_category, self.state, self.description)
 
 	def get_useful_info(self, html_string):
-		#park_info = html_string.find(class_ = 'col-md-12 col-sm-12  noPadding stateListLinks')
 		park_info = html_string.find(class_ = 'col-md-3 col-sm-3 col-xs-12 result-details-container table-cell list_right')
 		info = park_info.find_all('li')
 		useful_info = [item.find('a').get('href') for item in info]
@@ -57,7 +56,7 @@ class NationalPark(object): # set up location, description, tel_number, site cat
 
 
 # Define a class called Article that accepts an HTML formatted string (representing one article on the National Parks' home page) as input. Use BeautifulSoup to parse through the html data
-# in order to correctly assign values to instance variables. Instance variables for this class should include the article' title, description, and the url to search it.
+# in order to correctly assign values to instance variables. Instance variables for this class should include the article's title, description, and the url to search it.
 
 class Article(object):
 
@@ -68,16 +67,19 @@ class Article(object):
 
 		self.article_url = html_string.find('a').get('href')
 
+
+# Define a class called States that accepts an HTML formatted string and the state name as input. Use BeautifulSoup to parse through thr html data in order to correctly
+# assign values to instance variables. Instance variables for this class should include the state name, the total number of visitors its national parks, the economic benfit obtained
+# from national park tourism, and the total tax incentives that have stimulated rehabilitation projects.
 class State(object):
 
 	def __init__(self, html_string, current_state):
 		state_info = html_string.find_all("li")
 
 		if " Visitors to National Parks" in state_info[1].text:
-			self.visitors = state_info[1].find('strong').text
+			self.visitors = int((state_info[1].find('strong').text).replace(',',''))
 		else:
-			self.visitors = 0
-		#print(self.visitors)
+			self.visitors = int(0)
 
 		if " Economic Benefit from National Park Tourism »" in state_info[2].text:
 			self.econ_benefit = state_info[2].find('strong').text
@@ -130,7 +132,7 @@ def get_natlparks_data():
 	return html_park_list
 		
 
-# Write a function called get_article_data that retrieves html data of the articles on the National Parks homepage. Add this html data to your cache file. 
+# Write a function called get_article_data that retrieves html data for the articles on the National Parks homepage. Add this html data to your cache file. 
 # Save and return the html data of the articles in a variable called html_articles, which represents the html data of the National Parks homepage. 
 def get_article_data():
 	unique_identifier = "article_data"
@@ -160,7 +162,7 @@ park_objs = []
 repeat_parks = []
 for state_html in html_park_data:
 	soup = BeautifulSoup(state_html, "html.parser")
-	current_state = soup.find(class_ = "ContentHeader").text
+	current_state = soup.find(class_ = "ContentHeader").text.strip()
 	#print(current_state)
 	st_parks = soup.find(class_ = "col-md-9 col-sm-12 col-xs-12 stateCol")
 	for item in st_parks.find_all(class_= "clearfix"):
@@ -188,7 +190,7 @@ article_objs = article_list1 + article_list2
 state_objs = []
 for state_html in html_park_data:
 	soup = BeautifulSoup(state_html, "html.parser")
-	current_state = soup.find(class_ = "ContentHeader").text
+	current_state = soup.find(class_ = "ContentHeader").text.strip()
 	state_info = soup.find(class_ = "col-md-3 col-sm-12 col-xs-12 stateCol stateCol-right")
 	state_objs.append(State(state_info, current_state))
 
@@ -257,10 +259,39 @@ for st in state_objs:
 
 conn.commit()
 
-# QUERIES GO HERE:
+# Queries to be written here:
 
+# the park that spans the most states 
+query = 'SELECT Parks.name, States.name FROM Parks INNER JOIN States on Parks.state = States.name'
+q1 = cur.execute(query)
+query_res = q1.fetchall()
+park_span = {}
+for tup in query_res:
+	if tup[0] in park_span:
+		park_span[tup[0]] += 1
+	else:
+		park_span[tup[0]] = 1 
+sorted_park_span = sorted(park_span, key = lambda x: park_span[x], reverse = True)
+largest_park_span = sorted_park_span[0]
 
+# park_span = collections.Counter(query_res).most_common(5)
+# print(park_span)
 
+#print(query_res)
+#max_parks_dict = {k:query_res.count(v) for (k,v) in query_res}
+#print(max_parks_dict.items())
+
+query = 'SELECT name, visitors FROM States WHERE States.visitors > 10000000'
+q3 = cur.execute(query)
+query_res = q3.fetchall()
+max_visitor_dict = {k:v for (k,v) in query_res}
+sorted_max_visitor = sorted(max_visitor_dict, key = lambda x: max_visitor_dict[x], reverse = True)
+top_3_visitors = sorted_max_visitor[0:3]
+
+query = 'SELECT name, econ_benefit FROM States WHERE States.econ_benefit > 1000000000'
+q2 = cur.execute(query)
+most_econ_benefit = q2.fetchall()
+#print(most_econ_benefit)
 
 # Put your tests here, with any edits you now need from when you turned them in with your project plan.
 
@@ -293,9 +324,9 @@ class TestPlan(unittest.TestCase):
 		file_contents = html_file.read()
 		html_file.close()
 		soup = BeautifulSoup(file_contents, "html.parser")
-		current_state = soup.find(class_ = "ContentHeader").text
+		current_state = soup.find(class_ = "ContentHeader").text.strip()
 		state_info = soup.find(class_ = "col-md-3 col-sm-12 col-xs-12 stateCol stateCol-right")
-		self.assertEqual(State(state_info, current_state).visitors, '2,386,613', 'Testing that the number of visitors is correct')
+		self.assertEqual(State(state_info, current_state).visitors, 2386613, 'Testing that the number of visitors is correct')
 	def test_DB(self):
 		conn = sqlite3.connect('national_parks.db')
 		cur = conn.cursor()
@@ -303,8 +334,6 @@ class TestPlan(unittest.TestCase):
 		result = cur.fetchall()
 		self.assertEqual(len(result), 644, 'Testing that the number of national parks in the database is 644')
 		conn.close()
-	
-
 
 
 ## Remember to invoke all your tests...
