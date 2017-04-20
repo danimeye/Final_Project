@@ -1,9 +1,5 @@
 ###### INSTRUCTIONS ###### 
 
-
-
-
-
 # An outline for preparing your final project assignment is in this file.
 
 # Below, throughout this file, you should put comments that explain exactly what you should do for each step of your project. You should specify variable names and processes to use. For example, "Use dictionary accumulation with the list you just created to create a dictionary called tag_counts, where the keys represent tags on flickr photos and the values represent frequency of times those tags occur in the list."
@@ -23,7 +19,7 @@ import json
 import requests
 import unittest
 import sqlite3
-import collections
+from collections import Counter
 from bs4 import BeautifulSoup
 # Begin filling in instructions....
 
@@ -150,11 +146,10 @@ def get_article_data():
 		cache_file.close()
 	return html_articles
 
-
-# Invoke the get_natlparks_data function and save it to a variable called html_park_data.
+# Invoke the get_natlparks_data function and save the result to a variable called html_park_data.
 html_park_data = get_natlparks_data()
 
-# Invoke the get_article_data function and save it to a variable called html_article_data. 
+# Invoke the get_article_data function and save the result to a variable called html_article_data. 
 html_article_data = get_article_data()
 
 # Using the information stored in html_park_data, create a list of NationalPark objects and save them in a variable called park_objs.
@@ -194,6 +189,39 @@ for state_html in html_park_data:
 	state_info = soup.find(class_ = "col-md-3 col-sm-12 col-xs-12 stateCol stateCol-right")
 	state_objs.append(State(state_info, current_state))
 
+# Write a function called get_weather_data that retrieves data about the average temperature for each state.
+def get_weather_data():
+	unique_identifier = "weather_data"
+	if unique_identifier in CACHE_DICTION:
+		print('using cached data')
+		weather_info = CACHE_DICTION[unique_identifier]
+	else:
+		print('accessing weather data from internet')
+		base_url = "https://www.currentresults.com/Weather/US/average-annual-state-temperatures.php"
+		weather_info = requests.get(base_url).text
+		CACHE_DICTION[unique_identifier] = weather_info
+		cache_file = open(CACHE_FNAME, 'w')
+		cache_file.write(json.dumps(CACHE_DICTION))
+		cache_file.close()
+	return weather_info 
+
+# Invoke the get_weather_data function and save the result to the variable weather_data.
+weather_data = get_weather_data()
+
+# Using the information stored in weather_data, create a dictionary with key value pairs that represent states as keys and their average tempertature as the associated value. 
+state_weather = {}
+soup = BeautifulSoup(weather_data, 'html.parser')
+temp_table = soup.find_all(class_ = 'articletable tablecol-1-left')
+for st in temp_table:
+	table = st.find_all('tbody')
+	for elem in table:
+		x = elem.find_all('tr')
+		for info in x:
+			state_name = info.find('a').text
+			state_temp = info.find_all('td')[1].text
+			state_weather[state_name] = state_temp
+#print(state_weather)
+
 # Create a database file called national_parks.db. In the database, you will make three tables called Parks, Articles, and States as follows:
 
 # table Parks, with columns:
@@ -215,6 +243,7 @@ for state_html in html_park_data:
 # - visitors (containing the integer representing the number of visitors to the national park)
 # - econ_benefit (containing the amount of money representing the economic benefit from national park tourism)
 # - tax_projects (containing the amount of money representing the tax incentives used to stimulate projects)
+# - weather (containing the average temperature of the state in fahrenheit)
 
 # You should load all of the above information into their respective tables.
 
@@ -249,12 +278,16 @@ for article in article_objs:
 	cur.execute(s2, article_vals)
 
 table_spec = 'CREATE TABLE IF NOT EXISTS '
-table_spec += 'States (id INTEGER PRIMARY KEY, name TEXT, visitors INTEGER, econ_benefit MONEY, tax_projects MONEY)'
+table_spec += 'States (id INTEGER PRIMARY KEY, name TEXT, visitors INTEGER, econ_benefit MONEY, tax_projects MONEY, avg_temperature FLOAT)'
 cur.execute(table_spec)
 
 for st in state_objs:
-	s3 = 'INSERT OR IGNORE INTO States Values(?, ?, ?, ?, ?)'
-	st_vals = (None, st.name, st.visitors, st.econ_benefit, st.tax_projects)
+	if st.name in state_weather:
+		st_temp = state_weather[st.name]
+	else:
+		st_temp = 0
+	s3 = 'INSERT OR IGNORE INTO States Values(?, ?, ?, ?, ?, ?)'
+	st_vals = (None, st.name, st.visitors, st.econ_benefit, st.tax_projects, st_temp)
 	cur.execute(s3, st_vals)
 
 conn.commit()
@@ -274,24 +307,65 @@ for tup in query_res:
 sorted_park_span = sorted(park_span, key = lambda x: park_span[x], reverse = True)
 largest_park_span = sorted_park_span[0]
 
-# park_span = collections.Counter(query_res).most_common(5)
-# print(park_span)
-
-#print(query_res)
-#max_parks_dict = {k:query_res.count(v) for (k,v) in query_res}
-#print(max_parks_dict.items())
+query = 'SELECT name, econ_benefit FROM States WHERE States.econ_benefit > 1000000000'
+q2 = cur.execute(query)
+most_econ_benefit = q2.fetchall()
+#print(most_econ_benefit)
 
 query = 'SELECT name, visitors FROM States WHERE States.visitors > 10000000'
 q3 = cur.execute(query)
 query_res = q3.fetchall()
 max_visitor_dict = {k:v for (k,v) in query_res}
 sorted_max_visitor = sorted(max_visitor_dict, key = lambda x: max_visitor_dict[x], reverse = True)
-top_3_visitors = sorted_max_visitor[0:3]
+top_5_visitors = sorted_max_visitor[0:5]
 
-query = 'SELECT name, econ_benefit FROM States WHERE States.econ_benefit > 1000000000'
-q2 = cur.execute(query)
-most_econ_benefit = q2.fetchall()
-#print(most_econ_benefit)
+query = 'SELECT description FROM Articles'
+q4 = cur.execute(query)
+query_res = q4.fetchall()
+
+#print(query_res)
+common_words = Counter(query_res)
+print(common_words)
+
+# for item in query_res:
+# 	temp_tup = (item[0], item[1].replace(" ", ""))
+# 	complete_common_words = {item[0]: Counter(temp_tup[1]).most_common(1) for temp_tup in item}
+# print(complete_common_words)
+
+#common_words = [Counter(query_res[1]).most_common(1) for item in query_res]
+# # article_dict = {k:v for (k,v) in query_res}
+# # article_list = Counter(query_res).most_common(1)
+
+
+# c = Counter(article_dict.values()).most_common(5)
+#print(common_words)
+#print(article_dict)
+# intial_count= 0
+# for item in article_dict:
+# 	# val = article_dict[item].split() # returns a list of all the words in the string
+# 	# c = Counter(val).most_common(5)
+
+
+
+file_name = '206finalproj_output.txt'
+output_file = open(file_name, 'w')
+sorted_output = sorted(state_objs, key = lambda x: x.visitors, reverse = True)
+output_visitors = sorted_output[:5]
+# print(output_visitors)
+visitor_list = [st.name for st in output_visitors]
+# print(visitor_list)
+
+# for park in park_objs:
+# 	if park.state in visitor_list:
+# 		print(park)
+# 	else: 
+# 		pass
+# print("The five states and regions with the largest number of visitors ")
+# # for obj in sorted_output[:5]:
+# # 	print(obj.name)
+# # 	if obj.name in 
+
+# output_file.write()
 
 # Put your tests here, with any edits you now need from when you turned them in with your project plan.
 
@@ -327,13 +401,20 @@ class TestPlan(unittest.TestCase):
 		current_state = soup.find(class_ = "ContentHeader").text.strip()
 		state_info = soup.find(class_ = "col-md-3 col-sm-12 col-xs-12 stateCol stateCol-right")
 		self.assertEqual(State(state_info, current_state).visitors, 2386613, 'Testing that the number of visitors is correct')
-	def test_DB(self):
+	def test_park_span1(self):
+		self.assertEqual(type(largest_park_span), type(""), 'Testing that the result of largest_park_span is a string')
+	def test_park_span2(self):
+		self.assertEqual(largest_park_span, 'Appalachian', 'Testing that the value of largest_park_span is Appalachian')
+	def top_visitor(self):
+		self.assertEqual(len(top_5_visitors), 5, 'Testing that top_5_visitors holds three elements')
+	def test_park_num(self):
 		conn = sqlite3.connect('national_parks.db')
 		cur = conn.cursor()
 		cur.execute('SELECT name FROM Parks')
 		result = cur.fetchall()
 		self.assertEqual(len(result), 644, 'Testing that the number of national parks in the database is 644')
 		conn.close()
+
 
 
 ## Remember to invoke all your tests...
